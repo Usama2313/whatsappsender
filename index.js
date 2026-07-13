@@ -94,7 +94,29 @@ async function uploadToVercelBlob(filePath, fileName, mimetype) {
   return url;
 }
 
-// ─── Helper: Upload to tmpfiles.org (fallback if Vercel Blob not configured) ──
+// ─── Helper: Upload to 0x0.st (serves raw files directly — Twilio compatible) ─
+async function uploadTo0x0(filePath, fileName, mimetype) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const blob = new Blob([fileBuffer], { type: mimetype });
+  const formData = new FormData();
+  formData.append('file', blob, fileName);
+  
+  const response = await fetch('https://0x0.st', {
+    method: 'POST',
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`0x0.st upload failed: ${response.status} ${response.statusText}`);
+  }
+  
+  // 0x0.st returns the URL as plain text
+  const url = (await response.text()).trim();
+  console.log(`  0x0.st URL: ${url}`);
+  return url;
+}
+
+// ─── Helper: Upload to tmpfiles.org (fallback) ────────────────────────────────
 async function uploadToTmpFiles(filePath, fileName, mimetype) {
   const fileBuffer = fs.readFileSync(filePath);
   const blob = new Blob([fileBuffer], { type: mimetype });
@@ -107,7 +129,7 @@ async function uploadToTmpFiles(filePath, fileName, mimetype) {
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to upload to tmpfiles.org: ${response.statusText}`);
+    throw new Error(`tmpfiles.org upload failed: ${response.statusText}`);
   }
   
   const data = await response.json();
@@ -115,18 +137,40 @@ async function uploadToTmpFiles(filePath, fileName, mimetype) {
   return uploadUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
 }
 
-// ─── Helper: Upload media — tries Vercel Blob first, falls back to tmpfiles ───
+// ─── Helper: Upload media — tries multiple CDNs until one works ───────────────
 async function uploadMedia(filePath, fileName, mimetype) {
+  const errors = [];
+
+  // 1. Try Vercel Blob (best — permanent, fast CDN, always accessible)
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      console.log(`Uploading ${fileName} to Vercel Blob...`);
+      console.log(`[upload] Trying Vercel Blob for ${fileName}...`);
       return await uploadToVercelBlob(filePath, fileName, mimetype);
     } catch (e) {
-      console.error('Vercel Blob upload failed, falling back to tmpfiles.org:', e.message);
+      console.error('[upload] Vercel Blob failed:', e.message);
+      errors.push(`Vercel Blob: ${e.message}`);
     }
   }
-  console.log(`Uploading ${fileName} to tmpfiles.org...`);
-  return await uploadToTmpFiles(filePath, fileName, mimetype);
+
+  // 2. Try 0x0.st (serves raw files, Twilio compatible)
+  try {
+    console.log(`[upload] Trying 0x0.st for ${fileName}...`);
+    return await uploadTo0x0(filePath, fileName, mimetype);
+  } catch (e) {
+    console.error('[upload] 0x0.st failed:', e.message);
+    errors.push(`0x0.st: ${e.message}`);
+  }
+
+  // 3. Try tmpfiles.org as last resort
+  try {
+    console.log(`[upload] Trying tmpfiles.org for ${fileName}...`);
+    return await uploadToTmpFiles(filePath, fileName, mimetype);
+  } catch (e) {
+    console.error('[upload] tmpfiles.org failed:', e.message);
+    errors.push(`tmpfiles.org: ${e.message}`);
+  }
+
+  throw new Error(`All CDN uploads failed for ${fileName}: ${errors.join('; ')}`);
 }
 
 // ─── Helper: get file category ───────────────────────────────────────────────
@@ -328,6 +372,15 @@ app.get('/api/test-upload', async (req, res) => {
       stack: err.stack
     });
   }
+});
+
+// ─── Global error handler — always return JSON, never HTML ────────────────────
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  });
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
