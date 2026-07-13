@@ -21,8 +21,8 @@ app.use(cors());
 app.use(express.json());
 
 // ─── File Upload Setup ───────────────────────────────────────────────────────
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
+const uploadsDir = process.env.VERCEL ? '/tmp' : path.join(__dirname, 'uploads');
+if (!process.env.VERCEL && !fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
@@ -220,7 +220,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✅ WhatsApp Sender Server running on http://localhost:${PORT}`);
-  console.log(`   Twilio FROM: ${FROM_NUMBER}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`✅ WhatsApp Sender Server running on http://localhost:${PORT}`);
+    console.log(`   Twilio FROM: ${FROM_NUMBER}`);
+  });
+}
+
+module.exports = app;
