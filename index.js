@@ -281,6 +281,30 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/api/test-upload', async (req, res) => {
+  try {
+    const tempPath = path.join(__dirname, 'test_dummy.txt');
+    fs.writeFileSync(tempPath, 'Hello from Vercel Serverless Upload Test!');
+    
+    console.log('Running test upload to tmpfiles.org...');
+    const url = await uploadToTmpFiles(tempPath, 'test_dummy.txt');
+    
+    try { fs.unlinkSync(tempPath); } catch (e) {}
+    
+    res.json({
+      success: true,
+      url: url
+    });
+  } catch (err) {
+    console.error('Test upload failed:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
 // ─── Start Server ─────────────────────────────────────────────────────────────
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
