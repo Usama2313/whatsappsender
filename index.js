@@ -283,7 +283,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/test-upload', async (req, res) => {
   try {
-    const tempPath = path.join(__dirname, 'test_dummy.txt');
+    const tempPath = path.join('/tmp', 'test_dummy.txt');
     fs.writeFileSync(tempPath, 'Hello from Vercel Serverless Upload Test!');
     
     console.log('Running test upload to tmpfiles.org...');
