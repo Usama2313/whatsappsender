@@ -83,7 +83,18 @@ const upload = multer({
 // ─── Serve uploaded files publicly so Twilio can fetch them ─────────────────
 app.use('/uploads', express.static(uploadsDir));
 
-// ─── Helper: Upload to tmpfiles.org (for temporary public CDN urls) ───────────
+// ─── Helper: Upload to Vercel Blob (permanent public CDN urls for Twilio) ─────
+async function uploadToVercelBlob(filePath, fileName, mimetype) {
+  const { put } = require('@vercel/blob');
+  const fileBuffer = fs.readFileSync(filePath);
+  const { url } = await put(fileName, fileBuffer, {
+    access: 'public',
+    contentType: mimetype,
+  });
+  return url;
+}
+
+// ─── Helper: Upload to tmpfiles.org (fallback if Vercel Blob not configured) ──
 async function uploadToTmpFiles(filePath, fileName, mimetype) {
   const fileBuffer = fs.readFileSync(filePath);
   const blob = new Blob([fileBuffer], { type: mimetype });
@@ -102,6 +113,20 @@ async function uploadToTmpFiles(filePath, fileName, mimetype) {
   const data = await response.json();
   const uploadUrl = data.data.url;
   return uploadUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+}
+
+// ─── Helper: Upload media — tries Vercel Blob first, falls back to tmpfiles ───
+async function uploadMedia(filePath, fileName, mimetype) {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      console.log(`Uploading ${fileName} to Vercel Blob...`);
+      return await uploadToVercelBlob(filePath, fileName, mimetype);
+    } catch (e) {
+      console.error('Vercel Blob upload failed, falling back to tmpfiles.org:', e.message);
+    }
+  }
+  console.log(`Uploading ${fileName} to tmpfiles.org...`);
+  return await uploadToTmpFiles(filePath, fileName, mimetype);
 }
 
 // ─── Helper: get file category ───────────────────────────────────────────────
@@ -160,7 +185,7 @@ app.post('/api/send-whatsapp', upload.array('files', 10), async (req, res) => {
     const mediaItems = await Promise.all(
       uploadedFiles.map(async (f) => {
         try {
-          const publicUrl = await uploadToTmpFiles(f.path, f.originalname, f.mimetype);
+          const publicUrl = await uploadMedia(f.path, f.originalname, f.mimetype);
           // Delete from local disk/temp immediately if upload succeeded to free space
           try { fs.unlinkSync(f.path); } catch (e) {}
           return {
