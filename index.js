@@ -214,7 +214,15 @@ app.post('/api/send-whatsapp', upload.array('files', 10), async (req, res) => {
   }
 });
 
-// ─── Health check ────────────────────────────────────────────────────────────
+// ─── Health check & Welcome ──────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({
+    message: 'WhatsApp Bulk Sender API is running.',
+    healthCheck: '/api/health',
+    status: 'online'
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', fromNumber: FROM_NUMBER });
 });
