@@ -10,11 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── Twilio Client ──────────────────────────────────────────────────────────
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-const FROM_NUMBER = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`;
+let client;
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+if (accountSid && authToken) {
+  try {
+    client = twilio(accountSid, authToken);
+  } catch (e) {
+    console.error('Failed to initialize Twilio client:', e);
+  }
+}
+
+const FROM_NUMBER = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER || ''}`;
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors());
@@ -85,6 +93,11 @@ function getFileCategory(mimetype) {
 // ─── API: Send WhatsApp Messages ─────────────────────────────────────────────
 app.post('/api/send-whatsapp', upload.array('files', 10), async (req, res) => {
   try {
+    if (!client) {
+      return res.status(500).json({
+        error: 'Twilio client is not initialized. Please verify your Vercel Environment Variables (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN).'
+      });
+    }
     const { numbers, message, contentSid, contentVariables } = req.body;
     const uploadedFiles = req.files || [];
 
@@ -224,7 +237,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', fromNumber: FROM_NUMBER });
+  res.json({ 
+    status: 'ok', 
+    fromNumber: FROM_NUMBER,
+    twilioInitialized: !!client
+  });
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
