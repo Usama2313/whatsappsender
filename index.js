@@ -84,9 +84,9 @@ const upload = multer({
 app.use('/uploads', express.static(uploadsDir));
 
 // ─── Helper: Upload to tmpfiles.org (for temporary public CDN urls) ───────────
-async function uploadToTmpFiles(filePath, fileName) {
+async function uploadToTmpFiles(filePath, fileName, mimetype) {
   const fileBuffer = fs.readFileSync(filePath);
-  const blob = new Blob([fileBuffer]);
+  const blob = new Blob([fileBuffer], { type: mimetype });
   const formData = new FormData();
   formData.append('file', blob, fileName);
   
@@ -160,7 +160,7 @@ app.post('/api/send-whatsapp', upload.array('files', 10), async (req, res) => {
     const mediaItems = await Promise.all(
       uploadedFiles.map(async (f) => {
         try {
-          const publicUrl = await uploadToTmpFiles(f.path, f.originalname);
+          const publicUrl = await uploadToTmpFiles(f.path, f.originalname, f.mimetype);
           // Delete from local disk/temp immediately if upload succeeded to free space
           try { fs.unlinkSync(f.path); } catch (e) {}
           return {
@@ -287,7 +287,7 @@ app.get('/api/test-upload', async (req, res) => {
     fs.writeFileSync(tempPath, 'Hello from Vercel Serverless Upload Test!');
     
     console.log('Running test upload to tmpfiles.org...');
-    const url = await uploadToTmpFiles(tempPath, 'test_dummy.txt');
+    const url = await uploadToTmpFiles(tempPath, 'test_dummy.txt', 'text/plain');
     
     try { fs.unlinkSync(tempPath); } catch (e) {}
     
