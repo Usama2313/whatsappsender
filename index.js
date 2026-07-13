@@ -83,6 +83,27 @@ const upload = multer({
 // ─── Serve uploaded files publicly so Twilio can fetch them ─────────────────
 app.use('/uploads', express.static(uploadsDir));
 
+// ─── Helper: Upload to tmpfiles.org (for temporary public CDN urls) ───────────
+async function uploadToTmpFiles(filePath, fileName) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const blob = new Blob([fileBuffer]);
+  const formData = new FormData();
+  formData.append('file', blob, fileName);
+  
+  const response = await fetch('https://tmpfiles.org/api/v1/upload', {
+    method: 'POST',
+    body: formData
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to upload to tmpfiles.org: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  const uploadUrl = data.data.url;
+  return uploadUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+}
+
 // ─── Helper: get file category ───────────────────────────────────────────────
 function getFileCategory(mimetype) {
   if (mimetype.startsWith('image/')) return 'image';
@@ -134,13 +155,29 @@ app.post('/api/send-whatsapp', upload.array('files', 10), async (req, res) => {
     }
 
     // Build media URLs — Twilio needs publicly accessible URLs
-    // If testing locally, use a service like ngrok and set PUBLIC_URL in .env
+    // We upload to tmpfiles.org so Twilio has a guaranteed public CDN link to download the media.
     const serverBaseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-    const mediaItems = uploadedFiles.map((f) => ({
-      url: `${serverBaseUrl}/uploads/${f.filename}`,
-      category: getFileCategory(f.mimetype),
-      originalName: f.originalname,
-    }));
+    const mediaItems = await Promise.all(
+      uploadedFiles.map(async (f) => {
+        try {
+          const publicUrl = await uploadToTmpFiles(f.path, f.originalname);
+          // Delete from local disk/temp immediately if upload succeeded to free space
+          try { fs.unlinkSync(f.path); } catch (e) {}
+          return {
+            url: publicUrl,
+            category: getFileCategory(f.mimetype),
+            originalName: f.originalname,
+          };
+        } catch (uploadErr) {
+          console.error(`Failed to upload ${f.originalname} to tmpfiles.org, using fallback:`, uploadErr);
+          return {
+            url: `${serverBaseUrl}/uploads/${f.filename}`,
+            category: getFileCategory(f.mimetype),
+            originalName: f.originalname,
+          };
+        }
+      })
+    );
 
     // Send to each number
     const results = await Promise.allSettled(
