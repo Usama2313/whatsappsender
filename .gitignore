@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+.env
+.env.*
+!.env.example
+server/uploads/
+server/data/
+server/cloudflared.exe
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+

@@ -1,0 +1,72 @@
+{
+  "name": "whatsapp-bulk-sender",
+  "version": "1.0.0",
+  "description": "WhatsApp Bulk Sender Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run start:server\" \"npm run start:client\"",
+    "build:react": "cd client && npm run build",
+    "prepackage": "npm run build:react",
+    "package": "electron-builder -w",
+    "install:client": "npm install --prefix client",
+    "install:all": "npm install && npm install --prefix client",
+    "build": "npm run build:react",
+    "start:server": "node server/index.js",
+    "start:client": "npm run dev --prefix client"
+  },
+  "build": {
+    "appId": "com.whatsapp.sender",
+    "productName": "WhatsApp Sender",
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "server/index.js",
+      "server/db.js",
+      "server/agent/**/*",
+      "client/dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/electron/**/*",
+      "!node_modules/electron-builder/**/*",
+      "!node_modules/.cache/**/*",
+      "!node_modules/.bin/**/*"
+    ],
+    "asar": true,
+    "extraFiles": [
+      {
+        "from": "server/.env",
+        "to": "resources/server/.env"
+      }
+    ]
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@vercel/blob": "^2.6.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.6",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "twilio": "^5.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-sender-server",
+  "version": "1.0.0",
+  "description": "WhatsApp Bulk Sender Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@vercel/blob": "^2.6.1",
+    "better-sqlite3": "^13.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.6",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "twilio": "^5.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

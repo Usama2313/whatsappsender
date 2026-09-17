@@ -1,0 +1,6 @@
+cloudflared.exe
+tunnel.log
+.tunnelurl
+test_files/
+uploads/
+*.log
